@@ -1,0 +1,8 @@
+# Dependencies
+node_modules/
+
+# Secrets and Config
+.env
+
+# OS files
+.DS_Store
