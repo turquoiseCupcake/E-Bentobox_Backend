@@ -28,13 +28,39 @@ const pool = new Pool({
   port: process.env.DB_PORT,
 });
 
-// Middleware
-app.use(cors());
-app.use(express.json()); // Crucial: Allows us to read JSON data from Flutter!
-
 // ==========================================
 // API ROUTES
 // ==========================================
+
+// POST: Real Authentication Registration Route
+app.post('/api/register', async (req, res) => {
+  // We accept 'name' which will be mapped to full_name (User) or store_name (Vendor)
+  const { name, email, password, role } = req.body;
+
+  try {
+    if (role === 'Vendor') {
+      await pool.query(
+        'INSERT INTO vendors (store_name, email, password_hash) VALUES ($1, $2, $3)',
+        [name, email, password] // In production, hash this password before inserting!
+      );
+    } else {
+      await pool.query(
+        'INSERT INTO users (full_name, email, password_hash) VALUES ($1, $2, $3)',
+        [name, email, password]
+      );
+    }
+
+    res.json({ success: true, message: 'Registration successful! You can now log in.' });
+
+  } catch (error) {
+    // 23505 is the PostgreSQL error code for a Unique Violation (e.g., email already exists)
+    if (error.code === '23505') {
+      return res.status(400).json({ success: false, message: 'This email is already registered.' });
+    }
+    console.error('Registration error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error.' });
+  }
+});
 
 // POST: Real Authentication Login Route
 app.post('/api/login', async (req, res) => {
