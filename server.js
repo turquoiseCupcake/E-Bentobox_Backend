@@ -172,6 +172,37 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
   }
 });
 
+// Add a New Menu Item Endpoint
+app.post('/api/menu-items', async (req, res) => {
+  const { vendor_id, name, price, category, image_url } = req.body;
+
+  try {
+    // 1. Basic validation
+    if (!vendor_id || !name || !price || !category) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+
+    // 2. Insert into the PostgreSQL database
+    const newMenuItem = await pool.query(
+      'INSERT INTO menu_items (vendor_id, name, price, category, image_url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [vendor_id, name, price, category, image_url]
+    );
+
+    console.log(`✅ New menu item saved: ${name}`);
+
+    // 3. Send success response back to Flutter
+    res.json({
+      success: true,
+      message: 'Menu item created successfully',
+      item: newMenuItem.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('Error saving menu item:', error);
+    res.status(500).json({ success: false, message: 'Server error while saving menu item' });
+  }
+});
+
 // ==========================================
 // START SERVER
 // ==========================================
