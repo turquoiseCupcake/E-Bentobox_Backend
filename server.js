@@ -203,6 +203,26 @@ app.post('/api/menu-items', async (req, res) => {
   }
 });
 
+// Get Menu Items for a Specific Vendor
+app.get('/api/menu-items/:vendorId', async (req, res) => {
+  const { vendorId } = req.params;
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM menu_items WHERE vendor_id = $1 ORDER BY created_at DESC',
+      [vendorId]
+    );
+
+    res.json({
+      success: true,
+      items: result.rows
+    });
+  } catch (error) {
+    console.error('Error fetching menu items:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching menu items' });
+  }
+});
+
 // ==========================================
 // START SERVER
 // ==========================================
