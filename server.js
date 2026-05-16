@@ -3,6 +3,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
+const multer = require('multer');
+const path = require('path');
 
 // Initialize the Express app
 const app = express();
@@ -15,6 +17,8 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 // Parse incoming JSON data automatically
 app.use(express.json());
+// Expose the uploads folder to the internet
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ==========================================
 // DATABASE CONNECTION
@@ -27,6 +31,22 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
   port: process.env.DB_PORT,
 });
+
+// ==========================================
+// MULTER STORAGE CONFIGURATION
+// ==========================================
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/'); // Save in the uploads directory
+  },
+  filename: function (req, file, cb) {
+    // Name format: vendorID_timestamp.jpg (e.g., menu_168425123.jpg)
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ storage: storage });
 
 // ==========================================
 // API ROUTES
@@ -125,6 +145,30 @@ app.get('/api/vendors', async (req, res) => {
   } catch (err) {
     console.error('Database query error:', err);
     res.status(500).json({ error: 'Failed to fetch vendors' });
+  }
+});
+
+// Image Upload Endpoint
+app.post('/api/upload', upload.single('image'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+    
+    // Create the public URL for the database
+    // Note: Make sure to construct this using your actual VPS IP in production
+    const imageUrl = `/uploads/${req.file.filename}`;
+    
+    console.log(`✅ Image uploaded successfully: ${imageUrl}`);
+    
+    res.json({
+      success: true,
+      message: 'Image uploaded successfully!',
+      imageUrl: imageUrl
+    });
+  } catch (error) {
+    console.error('Upload Error:', error);
+    res.status(500).json({ success: false, message: 'Server error during upload' });
   }
 });
 
