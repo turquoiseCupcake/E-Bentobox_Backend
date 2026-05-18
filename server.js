@@ -155,7 +155,7 @@ app.get('/api/vendors/:id', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'SELECT id, store_name, email, location_description, profile_image_url, description, operating_hours, latitude, longitude FROM vendors WHERE id = $1',
+      'SELECT id, store_name, email, location_description, profile_image_url, cover_image_url, description, operating_hours, latitude, longitude FROM vendors WHERE id = $1',
       [id]
     );
 
@@ -173,15 +173,15 @@ app.get('/api/vendors/:id', async (req, res) => {
 // --- UPDATE VENDOR PROFILE ---
 app.put('/api/vendors/:id', async (req, res) => {
   const { id } = req.params;
-  const { store_name, location_description, profile_image_url, description, operating_hours, latitude, longitude } = req.body;
+  const { store_name, location_description, profile_image_url, cover_image_url, description, operating_hours, latitude, longitude } = req.body;
 
   try {
     const result = await pool.query(
       `UPDATE vendors 
-       SET store_name = $1, location_description = $2, profile_image_url = $3, 
-           description = $4, operating_hours = $5, latitude = $6, longitude = $7 
-       WHERE id = $8 RETURNING id, store_name, email, location_description, profile_image_url, description, operating_hours, latitude, longitude`,
-      [store_name, location_description, profile_image_url, description, operating_hours, latitude, longitude, id]
+       SET store_name = $1, location_description = $2, profile_image_url = $3, cover_image_url = $4,
+           description = $5, operating_hours = $6, latitude = $7, longitude = $8 
+       WHERE id = $9 RETURNING *`,
+      [store_name, location_description, profile_image_url, cover_image_url, description, operating_hours, latitude, longitude, id]
     );
 
     if (result.rows.length === 0) {
