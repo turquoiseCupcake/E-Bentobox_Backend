@@ -149,6 +149,52 @@ app.get('/api/vendors', async (req, res) => {
   }
 });
 
+// --- GET VENDOR PROFILE ---
+app.get('/api/vendors/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query(
+      'SELECT id, store_name, email, location_description, profile_image_url, description, operating_hours, latitude, longitude FROM vendors WHERE id = $1',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
+    }
+
+    res.json({ success: true, vendor: result.rows[0] });
+  } catch (error) {
+    console.error('Error fetching vendor profile:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching profile' });
+  }
+});
+
+// --- UPDATE VENDOR PROFILE ---
+app.put('/api/vendors/:id', async (req, res) => {
+  const { id } = req.params;
+  const { store_name, location_description, profile_image_url, description, operating_hours, latitude, longitude } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE vendors 
+       SET store_name = $1, location_description = $2, profile_image_url = $3, 
+           description = $4, operating_hours = $5, latitude = $6, longitude = $7 
+       WHERE id = $8 RETURNING id, store_name, email, location_description, profile_image_url, description, operating_hours, latitude, longitude`,
+      [store_name, location_description, profile_image_url, description, operating_hours, latitude, longitude, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
+    }
+
+    res.json({ success: true, message: 'Profile updated successfully', vendor: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating vendor profile:', error);
+    res.status(500).json({ success: false, message: 'Server error updating profile' });
+  }
+});
+
 // Image Upload Endpoint
 app.post('/api/upload', upload.single('image'), (req, res) => {
   try {
