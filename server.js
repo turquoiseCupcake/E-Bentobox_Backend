@@ -5,6 +5,7 @@ const cors = require('cors');
 const { Pool } = require('pg');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
 // Initialize the Express app
 const app = express();
@@ -220,6 +221,61 @@ app.get('/api/menu-items/:vendorId', async (req, res) => {
   } catch (error) {
     console.error('Error fetching menu items:', error);
     res.status(500).json({ success: false, message: 'Server error fetching menu items' });
+  }
+});
+
+// Update an existing Menu Item
+app.put('/api/menu-items/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, price, category, description, is_available, image_url } = req.body;
+
+  try {
+    const result = await pool.query(
+      'UPDATE menu_items SET name = $1, price = $2, category = $3, description = $4, is_available = $5, image_url = $6 WHERE id = $7 RETURNING *',
+      [name, price, category, description, is_available, image_url, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Item not found' });
+    }
+
+    res.json({ success: true, message: 'Item updated successfully', item: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating menu item:', error);
+    res.status(500).json({ success: false, message: 'Server error updating menu item' });
+  }
+});
+
+// Delete a Menu Item
+app.delete('/api/menu-items/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // 1. Fetch the item first so we know what image to delete
+    const itemResult = await pool.query('SELECT image_url FROM menu_items WHERE id = $1', [id]);
+    
+    if (itemResult.rows.length > 0) {
+      const imageUrl = itemResult.rows[0].image_url;
+      
+      if (imageUrl) {
+        // Extract just the filename (e.g., 'image-123.jpg') and delete it from the hard drive
+        const fileName = imageUrl.split('/').pop();
+        const imagePath = path.join(__dirname, 'uploads', fileName);
+        
+        if (fs.existsSync(imagePath)) {
+          fs.unlinkSync(imagePath);
+          console.log(`🗑️ Deleted image file: ${fileName}`);
+        }
+      }
+    }
+
+    // 2. Delete the row from PostgreSQL
+    await pool.query('DELETE FROM menu_items WHERE id = $1', [id]);
+
+    res.json({ success: true, message: 'Item deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting menu item:', error);
+    res.status(500).json({ success: false, message: 'Server error deleting menu item' });
   }
 });
 
