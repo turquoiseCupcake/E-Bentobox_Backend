@@ -135,17 +135,35 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to the E-Bentobox API! 🍱' });
 });
 
-// 2. Test Endpoint: Get a list of active vendors
+// --- GET ALL ACTIVE VENDORS ---
 app.get('/api/vendors', async (req, res) => {
   try {
-    // Query the database securely
     const result = await pool.query(
-      'SELECT id, store_name, location_description FROM vendors WHERE is_active = true'
+      'SELECT id, store_name, location_description, profile_image_url, cover_image_url, description, operating_hours FROM vendors WHERE is_active = true'
     );
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Database query error:', err);
-    res.status(500).json({ error: 'Failed to fetch vendors' });
+    res.json({ success: true, vendors: result.rows });
+  } catch (error) {
+    console.error('Error fetching vendors:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// --- GET ALL AVAILABLE MENU ITEMS (FOR EXPLORE FEED) ---
+app.get('/api/menu-items', async (req, res) => {
+  try {
+    // This query joins the menu item with the vendor to get the store name!
+    const query = `
+      SELECT m.*, v.store_name 
+      FROM menu_items m 
+      JOIN vendors v ON m.vendor_id = v.id 
+      WHERE m.is_available_tomorrow = true 
+      ORDER BY RANDOM() LIMIT 30
+    `;
+    const result = await pool.query(query);
+    res.json({ success: true, items: result.rows });
+  } catch (error) {
+    console.error('Error fetching all menu items:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
