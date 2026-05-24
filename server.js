@@ -325,6 +325,60 @@ app.delete('/api/menu-items/:id', async (req, res) => {
   }
 });
 
+// --- GET ORDERS FOR A SPECIFIC VENDOR AND DATE ---
+app.get('/api/vendors/:vendorId/orders', async (req, res) => {
+  const { vendorId } = req.params;
+  const { date } = req.query; // Expecting format YYYY-MM-DD
+
+  try {
+    // This query joins the orders, users (for customer name), and order_items tables
+    const query = `
+      SELECT 
+          o.id, 
+          o.total_amount AS total, 
+          o.status, 
+          u.full_name AS customer,
+          COALESCE(string_agg(oi.quantity || 'x ' || m.name, ', '), 'No items') AS items
+      FROM orders o
+      JOIN users u ON o.user_id = u.id
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      LEFT JOIN menu_items m ON oi.menu_item_id = m.id
+      WHERE o.vendor_id = $1 AND o.reservation_date = $2
+      GROUP BY o.id, u.full_name
+      ORDER BY o.created_at ASC;
+    `;
+    
+    const result = await pool.query(query, [vendorId, date]);
+    
+    res.json({ success: true, orders: result.rows });
+  } catch (error) {
+    console.error('Error fetching orders:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching orders' });
+  }
+});
+
+// --- UPDATE ORDER STATUS ---
+app.put('/api/orders/:orderId/status', async (req, res) => {
+  const { orderId } = req.params;
+  const { status } = req.body;
+
+  try {
+    const result = await pool.query(
+      'UPDATE orders SET status = $1 WHERE id = $2 RETURNING *',
+      [status, orderId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    res.json({ success: true, message: 'Status updated successfully' });
+  } catch (error) {
+    console.error('Error updating status:', error);
+    res.status(500).json({ success: false, message: 'Server error updating status' });
+  }
+});
+
 // ==========================================
 // START SERVER
 // ==========================================
