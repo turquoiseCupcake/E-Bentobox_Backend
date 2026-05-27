@@ -397,6 +397,51 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
   }
 });
 
+app.post('/api/orders', async (req, res) => {
+  const { user_id, vendor_id, total_amount, reservation_date, items } = req.body;
+
+  // We use a database client directly to handle a "Transaction"
+  const client = await pool.connect();
+
+  try {
+    // Start Transaction
+    await client.query('BEGIN');
+
+    // 1. Create the main Order record
+    const orderResult = await client.query(
+      `INSERT INTO orders (user_id, vendor_id, total_amount, reservation_date, status) 
+       VALUES ($1, $2, $3, $4, 'Pending') RETURNING id`,
+      [user_id, vendor_id, total_amount, reservation_date]
+    );
+    
+    const orderId = orderResult.rows[0].id;
+
+    // 2. Loop through the cart and insert each specific food item
+    for (let item of items) {
+      await client.query(
+        `INSERT INTO order_items (order_id, menu_item_id, quantity, price_at_time) 
+         VALUES ($1, $2, $3, $4)`,
+        [orderId, item.menu_item_id, item.quantity, item.price]
+      );
+    }
+
+    // If everything succeeded, save it permanently!
+    await client.query('COMMIT');
+    
+    console.log(`✅ New order placed! Order ID: ${orderId}`);
+    res.json({ success: true, message: 'Order placed successfully', orderId });
+
+  } catch (error) {
+    // If anything fails, undo all database changes
+    await client.query('ROLLBACK');
+    console.error('Checkout Error:', error);
+    res.status(500).json({ success: false, message: 'Server error during checkout' });
+  } finally {
+    // Always release the client back to the pool
+    client.release();
+  }
+});
+
 // ==========================================
 // START SERVER
 // ==========================================
