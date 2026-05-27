@@ -442,6 +442,38 @@ app.post('/api/orders', async (req, res) => {
   }
 });
 
+// --- GET ORDERS FOR A SPECIFIC USER (STUDENT) AND DATE ---
+app.get('/api/users/:userId/orders', async (req, res) => {
+  const { userId } = req.params;
+  const { date } = req.query; // Expecting format YYYY-MM-DD
+
+  try {
+    // This query joins orders, vendors (for store name), and order_items
+    const query = `
+      SELECT 
+          o.id, 
+          o.total_amount AS total, 
+          o.status, 
+          v.store_name AS vendor_name,
+          COALESCE(string_agg(oi.quantity || 'x ' || m.name, ', '), 'No items') AS items
+      FROM orders o
+      JOIN vendors v ON o.vendor_id = v.id
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      LEFT JOIN menu_items m ON oi.menu_item_id = m.id
+      WHERE o.user_id = $1 AND o.reservation_date = $2
+      GROUP BY o.id, v.store_name
+      ORDER BY o.created_at ASC;
+    `;
+    
+    const result = await pool.query(query, [userId, date]);
+    
+    res.json({ success: true, orders: result.rows });
+  } catch (error) {
+    console.error('Error fetching user orders:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching orders' });
+  }
+});
+
 // ==========================================
 // START SERVER
 // ==========================================
