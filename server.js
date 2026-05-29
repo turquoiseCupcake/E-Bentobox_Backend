@@ -162,7 +162,7 @@ app.get('/', (req, res) => {
 app.get('/api/vendors', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, store_name, location_description, profile_image_url, cover_image_url, description, operating_hours FROM vendors WHERE is_active = true'
+      'SELECT id, store_name, location_description, profile_image_url, cover_image_url, description, operating_hours, latitude, longitude FROM vendors WHERE is_active = true'
     );
     res.json({ success: true, vendors: result.rows });
   } catch (error) {
