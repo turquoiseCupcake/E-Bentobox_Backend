@@ -480,20 +480,22 @@ app.get('/api/users/:userId/orders', async (req, res) => {
   const { date } = req.query; // Expecting format YYYY-MM-DD
 
   try {
-    // This query joins orders, vendors (for store name), and order_items
     const query = `
       SELECT 
           o.id, 
           o.total_amount AS total, 
           o.status, 
           v.store_name AS vendor_name,
+          v.latitude AS vendor_latitude,
+          v.longitude AS vendor_longitude,
+          v.location_description,
           COALESCE(string_agg(oi.quantity || 'x ' || m.name, ', '), 'No items') AS items
       FROM orders o
       JOIN vendors v ON o.vendor_id = v.id
       LEFT JOIN order_items oi ON o.id = oi.order_id
       LEFT JOIN menu_items m ON oi.menu_item_id = m.id
       WHERE o.user_id = $1 AND o.reservation_date = $2
-      GROUP BY o.id, v.store_name
+      GROUP BY o.id, v.store_name, v.latitude, v.longitude, v.location_description
       ORDER BY o.created_at ASC;
     `;
     
