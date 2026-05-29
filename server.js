@@ -7,9 +7,32 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+// NEW: Add HTTP and Socket.IO imports
+const http = require('http');
+const { Server } = require('socket.io');
+
 // Initialize the Express app
 const app = express();
 const port = process.env.PORT || 3000;
+
+// NEW: Wrap the Express app with a standard HTTP server
+const server = http.createServer(app);
+
+// NEW: Initialize Socket.IO with CORS enabled so Flutter can connect
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+  }
+});
+
+// Listen for live connections
+io.on('connection', (socket) => {
+  console.log('📱 A user connected to live notifications: ' + socket.id);
+  
+  socket.on('disconnect', () => {
+    console.log('User disconnected');
+  });
+});
 
 // ==========================================
 // MIDDLEWARE
@@ -390,6 +413,15 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
+    const updatedOrder = result.rows[0];
+
+    // NEW: Broadcast this update instantly to all connected Flutter apps!
+    io.emit('order_status_update', {
+      orderId: updatedOrder.id,
+      userId: updatedOrder.user_id,
+      status: updatedOrder.status,
+    });
+
     res.json({ success: true, message: 'Status updated successfully' });
   } catch (error) {
     console.error('Error updating status:', error);
@@ -477,6 +509,6 @@ app.get('/api/users/:userId/orders', async (req, res) => {
 // ==========================================
 // START SERVER
 // ==========================================
-app.listen(port, () => {
-  console.log(`🚀 Server is running on http://localhost:${port}`);
+server.listen(port, () => {
+  console.log(`🚀 Server and WebSockets are running on port ${port}`);
 });
