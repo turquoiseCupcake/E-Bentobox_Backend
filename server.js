@@ -369,17 +369,11 @@ app.delete('/api/menu-items/:id', async (req, res) => {
 // --- GET ORDERS FOR A SPECIFIC VENDOR AND DATE ---
 app.get('/api/vendors/:vendorId/orders', async (req, res) => {
   const { vendorId } = req.params;
-  const { date } = req.query; // Expecting format YYYY-MM-DD
+  const { date } = req.query;
 
   try {
-    // This query joins the orders, users (for customer name), and order_items tables
     const query = `
-      SELECT 
-          o.id, 
-          o.total_amount AS total, 
-          o.status, 
-          u.full_name AS customer,
-          COALESCE(string_agg(oi.quantity || 'x ' || m.name, ', '), 'No items') AS items
+      SELECT o.id, o.total_amount AS total, o.status, o.qr_sticker_id, u.full_name AS customer, COALESCE(string_agg(oi.quantity || 'x ' || m.name, ', '), 'No items') AS items
       FROM orders o
       JOIN users u ON o.user_id = u.id
       LEFT JOIN order_items oi ON o.id = oi.order_id
@@ -388,25 +382,24 @@ app.get('/api/vendors/:vendorId/orders', async (req, res) => {
       GROUP BY o.id, u.full_name
       ORDER BY o.created_at ASC;
     `;
-    
     const result = await pool.query(query, [vendorId, date]);
-    
     res.json({ success: true, orders: result.rows });
   } catch (error) {
-    console.error('Error fetching orders:', error);
-    res.status(500).json({ success: false, message: 'Server error fetching orders' });
+    console.error('Error fetching vendor orders:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
 // --- UPDATE ORDER STATUS ---
 app.put('/api/orders/:orderId/status', async (req, res) => {
   const { orderId } = req.params;
-  const { status } = req.body;
+  const { status, qr_sticker_id } = req.body; // Catch the new QR variable
 
   try {
+    // We use COALESCE so if a QR code isn't sent (like during 'Accept' or 'Reject'), it keeps the old one!
     const result = await pool.query(
-      'UPDATE orders SET status = $1 WHERE id = $2 RETURNING *',
-      [status, orderId]
+      'UPDATE orders SET status = $1, qr_sticker_id = COALESCE($2, qr_sticker_id) WHERE id = $3 RETURNING *',
+      [status, qr_sticker_id, orderId]
     );
 
     if (result.rows.length === 0) {
@@ -477,19 +470,11 @@ app.post('/api/orders', async (req, res) => {
 // --- GET ORDERS FOR A SPECIFIC USER (STUDENT) AND DATE ---
 app.get('/api/users/:userId/orders', async (req, res) => {
   const { userId } = req.params;
-  const { date } = req.query; // Expecting format YYYY-MM-DD
+  const { date } = req.query;
 
   try {
     const query = `
-      SELECT 
-          o.id, 
-          o.total_amount AS total, 
-          o.status, 
-          v.store_name AS vendor_name,
-          v.latitude AS vendor_latitude,
-          v.longitude AS vendor_longitude,
-          v.location_description,
-          COALESCE(string_agg(oi.quantity || 'x ' || m.name, ', '), 'No items') AS items
+      SELECT o.id, o.total_amount AS total, o.status, o.qr_sticker_id, v.store_name AS vendor_name, v.latitude AS vendor_latitude, v.longitude AS vendor_longitude, v.location_description, COALESCE(string_agg(oi.quantity || 'x ' || m.name, ', '), 'No items') AS items
       FROM orders o
       JOIN vendors v ON o.vendor_id = v.id
       LEFT JOIN order_items oi ON o.id = oi.order_id
@@ -498,9 +483,7 @@ app.get('/api/users/:userId/orders', async (req, res) => {
       GROUP BY o.id, v.store_name, v.latitude, v.longitude, v.location_description
       ORDER BY o.created_at ASC;
     `;
-    
     const result = await pool.query(query, [userId, date]);
-    
     res.json({ success: true, orders: result.rows });
   } catch (error) {
     console.error('Error fetching user orders:', error);
