@@ -491,6 +491,39 @@ app.get('/api/users/:userId/orders', async (req, res) => {
   }
 });
 
+// --- CHANGE PASSWORD ROUTE (For both Users and Vendors) ---
+app.put('/api/change-password', async (req, res) => {
+  const { userId, role, oldPassword, newPassword } = req.body;
+
+  try {
+    // Determine which table to check based on the role
+    const tableName = role === 'Vendor' ? 'vendors' : 'users';
+
+    // 1. Fetch the current password to verify it matches
+    const userRes = await pool.query(`SELECT password_hash FROM ${tableName} WHERE id = $1`, [userId]);
+    
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Account not found.' });
+    }
+
+    const currentPassword = userRes.rows[0].password_hash;
+
+    // 2. Verify old password
+    if (currentPassword !== oldPassword) {
+      return res.status(401).json({ success: false, message: 'Incorrect old password.' });
+    }
+
+    // 3. Update to the new password
+    await pool.query(`UPDATE ${tableName} SET password_hash = $1 WHERE id = $2`, [newPassword, userId]);
+
+    res.json({ success: true, message: 'Password updated successfully!' });
+  } catch (error) {
+    console.error('Error changing password:', error);
+    res.status(500).json({ success: false, message: 'Server error changing password.' });
+  }
+});
+
+
 // ==========================================
 // START SERVER
 // ==========================================
