@@ -1,19 +1,15 @@
-// Import required packages
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+require('dotenv').config();
 
 // NEW: Add HTTP and Socket.IO imports
 const http = require('http');
 const { Server } = require('socket.io');
+const path = require('path');
+const multer = require('multer');
 
-// Initialize the Express app
 const app = express();
-const port = process.env.PORT || 3000;
 
 // NEW: Wrap the Express app with a standard HTTP server
 const server = http.createServer(app);
@@ -34,20 +30,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// ==========================================
-// MIDDLEWARE
-// ==========================================
-// Allow cross-origin requests (so your Flutter app can talk to the server)
-app.use(cors());
-// Parse incoming JSON data automatically
-app.use(express.json());
-// Expose the uploads folder to the internet
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// ==========================================
-// DATABASE CONNECTION
-// ==========================================
-// Set up the PostgreSQL connection pool using environment variables
 const pool = new Pool({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
@@ -55,6 +37,10 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
   port: process.env.DB_PORT,
 });
+
+app.use(cors());
+app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ==========================================
 // MULTER STORAGE CONFIGURATION
@@ -399,13 +385,12 @@ app.get('/api/vendors/:vendorId/orders', async (req, res) => {
   }
 });
 
-// --- UPDATE ORDER STATUS ---
+// --- FIND YOUR ORDER STATUS UPDATE ROUTE AND MODIFY IT ---
 app.put('/api/orders/:orderId/status', async (req, res) => {
   const { orderId } = req.params;
-  const { status, qr_sticker_id } = req.body; // Catch the new QR variable
+  const { status, qr_sticker_id } = req.body;
 
   try {
-    // We use COALESCE so if a QR code isn't sent (like during 'Accept' or 'Reject'), it keeps the old one!
     const result = await pool.query(
       'UPDATE orders SET status = $1, qr_sticker_id = COALESCE($2, qr_sticker_id) WHERE id = $3 RETURNING *',
       [status, qr_sticker_id, orderId]
@@ -536,6 +521,7 @@ app.put('/api/change-password', async (req, res) => {
 // ==========================================
 // START SERVER
 // ==========================================
-server.listen(port, () => {
-  console.log(`🚀 Server and WebSockets are running on port ${port}`);
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`🚀 Server and WebSockets are running on port ${PORT}`);
 });
