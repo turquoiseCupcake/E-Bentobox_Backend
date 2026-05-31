@@ -338,17 +338,21 @@ app.delete('/api/menu-items/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    // 1. Fetch the item first so we know what image to delete
+    // 1. Delete the row from PostgreSQL FIRST.
+    // If it fails here (because of existing orders), it will jump to catch BEFORE deleting the image.
+    await pool.query('DELETE FROM menu_items WHERE id = $1', [id]);
+
+    // 2. If the delete succeeded, fetch the image URL to delete the physical file
     const itemResult = await pool.query('SELECT image_url FROM menu_items WHERE id = $1', [id]);
     
     if (itemResult.rows.length > 0) {
       const imageUrl = itemResult.rows[0].image_url;
       
       if (imageUrl) {
-        // Extract just the filename (e.g., 'image-123.jpg') and delete it from the hard drive
         const fileName = imageUrl.split('/').pop();
         const imagePath = path.join(__dirname, 'uploads', fileName);
         
+        const fs = require('fs');
         if (fs.existsSync(imagePath)) {
           fs.unlinkSync(imagePath);
           console.log(`🗑️ Deleted image file: ${fileName}`);
@@ -356,11 +360,16 @@ app.delete('/api/menu-items/:id', async (req, res) => {
       }
     }
 
-    // 2. Delete the row from PostgreSQL
-    await pool.query('DELETE FROM menu_items WHERE id = $1', [id]);
-
     res.json({ success: true, message: 'Item deleted successfully' });
   } catch (error) {
+    // Catch the specific Foreign Key Violation error!
+    if (error.code === '23503') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Cannot delete: This item is part of a student\'s order history. Please toggle "Available Today" off instead.' 
+      });
+    }
+    
     console.error('Error deleting menu item:', error);
     res.status(500).json({ success: false, message: 'Server error deleting menu item' });
   }
