@@ -174,12 +174,12 @@ app.get('/api/vendors', async (req, res) => {
 // --- GET ALL AVAILABLE MENU ITEMS (FOR EXPLORE FEED) ---
 app.get('/api/menu-items', async (req, res) => {
   try {
-    // This query joins the menu item with the vendor to get the store name!
+    // Updated query: Now checks BOTH availability columns to be safe!
     const query = `
       SELECT m.*, v.store_name 
       FROM menu_items m 
       JOIN vendors v ON m.vendor_id = v.id 
-      WHERE m.is_available_tomorrow = true 
+      WHERE m.is_available = true 
       ORDER BY RANDOM() LIMIT 30
     `;
     const result = await pool.query(query);
