@@ -148,7 +148,7 @@ app.get('/', (req, res) => {
 app.get('/api/vendors', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, store_name, location_description, profile_image_url, cover_image_url, description, operating_hours, latitude, longitude FROM vendors WHERE is_active = true'
+      'SELECT id, store_name, location_description, profile_image_url, cover_image_url, description, operating_hours, latitude, longitude, is_active FROM vendors ORDER BY id ASC'
     );
     res.json({ success: true, vendors: result.rows });
   } catch (error) {
@@ -200,15 +200,16 @@ app.get('/api/vendors/:id', async (req, res) => {
 // --- UPDATE VENDOR PROFILE ---
 app.put('/api/vendors/:id', async (req, res) => {
   const { id } = req.params;
-  const { store_name, location_description, profile_image_url, cover_image_url, description, operating_hours, latitude, longitude } = req.body;
+  const { store_name, location_description, profile_image_url, cover_image_url, description, operating_hours, latitude, longitude, is_active } = req.body;
 
   try {
     const result = await pool.query(
       `UPDATE vendors 
        SET store_name = $1, location_description = $2, profile_image_url = $3, cover_image_url = $4,
-           description = $5, operating_hours = $6, latitude = $7, longitude = $8 
-       WHERE id = $9 RETURNING *`,
-      [store_name, location_description, profile_image_url, cover_image_url, description, operating_hours, latitude, longitude, id]
+           description = $5, operating_hours = $6, latitude = $7, longitude = $8,
+           is_active = COALESCE($9, is_active)
+       WHERE id = $10 RETURNING *`,
+      [store_name, location_description, profile_image_url, cover_image_url, description, operating_hours, latitude, longitude, is_active, id]
     );
 
     if (result.rows.length === 0) {
